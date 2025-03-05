@@ -24,9 +24,20 @@ A Model Context Protocol (MCP) server for Warpcast integration that allows you t
    npm install
    ```
 
-3. Get Warpcast API credentials
-   
-   To use this server, you'll need to register a signing key with Warpcast. There are two approaches you can use:
+3. Generate API Keys and Configure Authentication
+
+   This MCP server provides a helper script to generate the necessary Ed25519 key pair:
+
+   ```bash
+   npm run generate-keys
+   ```
+
+   Follow the prompts to:
+   - Generate a random Ed25519 key pair
+   - Save the keys to your `.env` file
+   - Get instructions for registering the key with Warpcast
+
+   Alternatively, if you prefer to set things up manually:
 
    ### Option 1: Using Signed Key Requests
 
@@ -97,20 +108,12 @@ A Model Context Protocol (MCP) server for Warpcast integration that allows you t
 
    If you already have an App Key set up for your Farcaster account, you can use the FID, private key, and public key directly.
 
-4. Set up environment variables:
-   Copy `.env.example` to `.env` and add your Warpcast API credentials:
-   ```
-   WARPCAST_FID=123456
-   WARPCAST_PRIVATE_KEY=your_private_key_here
-   WARPCAST_PUBLIC_KEY=your_public_key_here
-   ```
-
-5. Build the server
+4. Build the server
    ```bash
    npm run build
    ```
 
-6. Configure Claude for Desktop to use this server
+5. Configure Claude for Desktop to use this server
 
 ## Configuration with Claude for Desktop
 
