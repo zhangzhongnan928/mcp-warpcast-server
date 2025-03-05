@@ -2,7 +2,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import warpcastApi, { Cast } from "./warpcast-api.js";
+import warpcastApi, { Cast, Channel } from "./warpcast-api.js";
+import { generateAuthToken } from "./auth.js";
 
 // Create an MCP server instance
 const server = new McpServer({
@@ -23,6 +24,20 @@ Cast ID: ${cast.hash}
 `;
 }
 
+// Utility function to format a channel as readable text
+function formatChannel(channel: Channel): string {
+  const date = new Date(channel.createdAt * 1000).toLocaleString();
+  return `
+Channel: ${channel.name} (#${channel.id})
+Description: ${channel.description || 'No description'}
+Created: ${date}
+Followers: ${channel.followerCount} · Members: ${channel.memberCount}
+${channel.publicCasting ? '🔓 Public casting enabled' : '🔒 Only members can cast'}
+URL: ${channel.url}
+---
+`;
+}
+
 // Tool: Post a new cast
 server.tool(
   "post-cast",
@@ -31,7 +46,8 @@ server.tool(
   },
   async ({ text }) => {
     try {
-      const cast = await warpcastApi.postCast(text);
+      const authToken = await generateAuthToken();
+      const cast = await warpcastApi.postCast(text, authToken);
       return {
         content: [
           {
@@ -63,7 +79,7 @@ server.tool(
   },
   async ({ username, limit }) => {
     try {
-      const casts = await warpcastApi.getUserCasts(username, limit);
+      const casts = await warpcastApi.getUserCasts(username, { limit });
       
       if (casts.length === 0) {
         return {
@@ -108,7 +124,7 @@ server.tool(
   },
   async ({ query, limit }) => {
     try {
-      const casts = await warpcastApi.searchCasts(query, limit);
+      const casts = await warpcastApi.searchCasts(query, { limit });
       
       if (casts.length === 0) {
         return {
@@ -152,7 +168,7 @@ server.tool(
   },
   async ({ limit }) => {
     try {
-      const casts = await warpcastApi.getTrendingCasts(limit);
+      const casts = await warpcastApi.getTrendingCasts({ limit });
       
       if (casts.length === 0) {
         return {
@@ -188,13 +204,227 @@ server.tool(
   }
 );
 
+// Tool: Get all channels
+server.tool(
+  "get-all-channels",
+  {
+    limit: z.number().min(1).max(50).default(10).describe("Number of channels to retrieve (max 50)"),
+  },
+  async ({ limit }) => {
+    try {
+      const channels = await warpcastApi.getAllChannels();
+      
+      // Take only the requested number of channels
+      const limitedChannels = channels.slice(0, limit);
+      
+      if (limitedChannels.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "No channels found",
+            },
+          ],
+        };
+      }
+
+      const formattedChannels = limitedChannels.map(formatChannel).join("\n");
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Channels on Warpcast:\n\n${formattedChannels}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error fetching channels: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  }
+);
+
+// Tool: Get specific channel
+server.tool(
+  "get-channel",
+  {
+    channelId: z.string().describe("The ID of the channel to retrieve"),
+  },
+  async ({ channelId }) => {
+    try {
+      const channel = await warpcastApi.getChannel(channelId);
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Channel information:\n\n${formatChannel(channel)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error fetching channel: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  }
+);
+
+// Tool: Get channel casts
+server.tool(
+  "get-channel-casts",
+  {
+    channelId: z.string().describe("The ID of the channel to retrieve casts from"),
+    limit: z.number().min(1).max(20).default(5).describe("Number of casts to retrieve (max 20)"),
+  },
+  async ({ channelId, limit }) => {
+    try {
+      const casts = await warpcastApi.getChannelCasts(channelId, { limit });
+      
+      if (casts.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `No casts found in channel ${channelId}`,
+            },
+          ],
+        };
+      }
+
+      const formattedCasts = casts.map(formatCast).join("\n");
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Latest casts from channel #${channelId}:\n\n${formattedCasts}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error fetching casts for channel: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  }
+);
+
+// Tool: Follow a channel
+server.tool(
+  "follow-channel",
+  {
+    channelId: z.string().describe("The ID of the channel to follow"),
+  },
+  async ({ channelId }) => {
+    try {
+      const authToken = await generateAuthToken();
+      const success = await warpcastApi.followChannel(channelId, authToken);
+      
+      if (success) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ Successfully followed channel #${channelId}`,
+            },
+          ],
+        };
+      } else {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to follow channel #${channelId}`,
+            },
+          ],
+        };
+      }
+    } catch (error) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error following channel: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  }
+);
+
+// Tool: Unfollow a channel
+server.tool(
+  "unfollow-channel",
+  {
+    channelId: z.string().describe("The ID of the channel to unfollow"),
+  },
+  async ({ channelId }) => {
+    try {
+      const authToken = await generateAuthToken();
+      const success = await warpcastApi.unfollowChannel(channelId, authToken);
+      
+      if (success) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ Successfully unfollowed channel #${channelId}`,
+            },
+          ],
+        };
+      } else {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to unfollow channel #${channelId}`,
+            },
+          ],
+        };
+      }
+    } catch (error) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error unfollowing channel: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  }
+);
+
 // Start the server with stdio transport
 async function main() {
   try {
     // Check for API credentials
-    if (!process.env.WARPCAST_API_KEY || !process.env.WARPCAST_API_SECRET) {
+    if (!process.env.WARPCAST_FID || !process.env.WARPCAST_PRIVATE_KEY || !process.env.WARPCAST_PUBLIC_KEY) {
       console.error("Error: Missing Warpcast API credentials!");
-      console.error("Please set WARPCAST_API_KEY and WARPCAST_API_SECRET environment variables.");
+      console.error("Please set WARPCAST_FID, WARPCAST_PRIVATE_KEY, and WARPCAST_PUBLIC_KEY environment variables.");
       process.exit(1);
     }
 
