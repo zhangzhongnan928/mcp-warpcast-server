@@ -47,9 +47,17 @@ This MCP server provides several tools that Claude can use:
    ```bash
    pip install -r requirements.txt
    ```
-2. Provide your Warpcast API token. You can either set the
+2. Obtain a Warpcast API token and export it as an environment variable:
+   - Log in to [Warpcast](https://warpcast.com/) and open **Settings \> Developer**.
+   - Click **Create API Token** and copy the value.
+   - Set `WARPCAST_API_TOKEN` in your shell:
+     ```bash
+     export WARPCAST_API_TOKEN=YOUR_TOKEN
+     ```
+ You can either set the
    `WARPCAST_API_TOKEN` environment variable or supply it in the `env`
    section of Claude's configuration (see below).
+   
 3. Start the server:
    ```bash
    uvicorn main:app --reload
