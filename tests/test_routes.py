@@ -168,3 +168,15 @@ def test_mcp_post_invalid_origin():
 def test_mcp_post_missing_origin():
     response = client.post("/mcp", json={"method": "initialize"})
     assert response.status_code == 403
+
+
+def test_auth_helpers_environment(monkeypatch):
+    monkeypatch.delenv("WARPCAST_API_TOKEN", raising=False)
+    import importlib
+    import warpcast_api
+    importlib.reload(warpcast_api)
+    assert not warpcast_api.has_token()
+    assert warpcast_api._auth_headers() == {}
+    monkeypatch.setenv("WARPCAST_API_TOKEN", "secret")
+    assert warpcast_api.has_token()
+    assert warpcast_api._auth_headers() == {"Authorization": "Bearer secret"}

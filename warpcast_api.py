@@ -5,7 +5,6 @@ import logging
 import requests
 
 API_BASE_URL = "https://api.warpcast.com/v2"
-API_TOKEN = os.getenv("WARPCAST_API_TOKEN")
 PROPAGATE_EXCEPTIONS = os.getenv("PROPAGATE_EXCEPTIONS") is not None
 
 logger = logging.getLogger(__name__)
@@ -13,13 +12,14 @@ logger = logging.getLogger(__name__)
 
 def has_token() -> bool:
     """Return True if the API token is configured."""
-    return bool(API_TOKEN)
+    return bool(os.getenv("WARPCAST_API_TOKEN"))
 
 
 def _auth_headers() -> Dict[str, str]:
-    if not API_TOKEN:
+    token = os.getenv("WARPCAST_API_TOKEN")
+    if not token:
         return {}
-    return {"Authorization": f"Bearer {API_TOKEN}"}
+    return {"Authorization": f"Bearer {token}"}
 
 
 def post_cast(text: str) -> Dict[str, Any]:
