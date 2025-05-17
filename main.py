@@ -1,10 +1,10 @@
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 import asyncio
 import json
 import os
-import sys  # Add import for sys
+import sys
 from urllib.parse import urlparse
 
 import logging
@@ -153,18 +153,24 @@ async def mcp_message(request: Request):
     if not origin or not _origin_allowed(origin):
         logger.info("Origin not allowed")
         raise HTTPException(status_code=403)
+    
     try:
         message = await request.json()
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
     
-    # Use logger instead of print to stderr
     logger.info(f"Received message: {message}")
 
-    if message.get("method") == "initialize":
+    method = message.get("method")
+    
+    if method == "initialize":
+        logger.info("Processing initialize request")
+        
         if not mcp_queues:
+            logger.error("No MCP stream established")
             raise HTTPException(status_code=400, detail="MCP stream not established")
 
+        # Create response for initialize method
         response = {
             "jsonrpc": "2.0",
             "id": message.get("id"),
@@ -174,26 +180,56 @@ async def mcp_message(request: Request):
                 "serverInfo": {"name": "Warpcast MCP Server", "version": "0.1.0"},
             },
         }
+        
+        # Send the response back through all connected queues
         for q in list(mcp_queues):
-            logger.debug("Sending initialize response")
-            await q.put(response)
-        return {"status": "ok"}
+            try:
+                logger.info("Sending initialize response through queue")
+                await q.put(response)
+            except Exception as e:
+                logger.error(f"Error sending response to queue: {e}")
+        
+        # Also return the response directly through the HTTP response
+        logger.info("Returning initialize response directly")
+        return JSONResponse(content=response)
 
-    if message.get("method") == "tools/list":
+    elif method == "tools/list":
+        logger.info("Processing tools/list request")
+        
         if not mcp_queues:
+            logger.error("No MCP stream established")
             raise HTTPException(status_code=400, detail="MCP stream not established")
+        
+        # Create response for tools/list method
         response = {
             "jsonrpc": "2.0",
             "id": message.get("id"),
             "result": {"tools": TOOLS, "nextCursor": None},
         }
+        
+        # Send the response back through all connected queues
         for q in list(mcp_queues):
-            logger.debug("Sending tools/list response")
-            await q.put(response)
-        return {"status": "ok"}
+            try:
+                logger.info("Sending tools/list response through queue")
+                await q.put(response)
+            except Exception as e:
+                logger.error(f"Error sending response to queue: {e}")
+        
+        # Also return the response directly through the HTTP response
+        logger.info("Returning tools/list response directly")
+        return JSONResponse(content=response)
 
-    raise HTTPException(status_code=404, detail="Method not found")
-    
+    else:
+        logger.error(f"Unknown method: {method}")
+        error_response = {
+            "jsonrpc": "2.0",
+            "id": message.get("id"),
+            "error": {
+                "code": -32601,
+                "message": f"Method not found: {method}"
+            }
+        }
+        return JSONResponse(content=error_response)
 
 @app.post("/post-cast")
 async def post_cast(req: CastRequest):
