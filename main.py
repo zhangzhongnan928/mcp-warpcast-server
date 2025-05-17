@@ -152,7 +152,10 @@ async def mcp_message(request: Request):
     if not origin or not _origin_allowed(origin):
         print("Origin not allowed", file=sys.stderr)
         raise HTTPException(status_code=403)
-    message = await request.json()
+    try:
+        message = await request.json()
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
     print(f"Received message: {message}", file=sys.stderr)
 
     if message.get("method") == "initialize":
