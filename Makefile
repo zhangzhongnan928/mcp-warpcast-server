@@ -2,4 +2,4 @@
 
 # Run the unit test suite
 test:
-	pytest -q
+	python run_tests.py

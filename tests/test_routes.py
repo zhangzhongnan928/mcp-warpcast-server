@@ -6,14 +6,14 @@ import httpx_stub
 sys.modules["httpx"] = httpx_stub
 
 import main
-from fastapi.testclient import TestClient
-
-client = TestClient(main.app)
 
 # Helper request object for mcp_message
 class FakeRequest:
-    def __init__(self, payload):
-        self._payload = payload
+    def __init__(self, payload=None, headers=None):
+        self._payload = payload or {}
+        if headers is None:
+            headers = {"origin": "http://localhost"}
+        self.headers = headers
 
     async def json(self):
         return self._payload
@@ -143,18 +143,31 @@ def test_mcp_multiple_streams():
 
 
 def test_handshake_removed():
-    response = client.post("/handshake", json={})
-    assert response.status_code == 404
+    assert not any(route.path == "/handshake" for route in main.app.routes)
 
 
 def test_mcp_stream_invalid_origin():
-    response = client.get("/mcp", headers={"Origin": "http://evil.com"})
-    assert response.status_code == 403
+    async def run_test():
+        try:
+            await main.mcp_stream(FakeRequest(headers={"origin": "http://evil.com"}))
+        except main.HTTPException as exc:
+            assert exc.status_code == 403
+        else:
+            assert False, "Expected HTTPException"
+
+    asyncio.run(run_test())
 
 
 def test_mcp_stream_missing_origin():
-    response = client.get("/mcp")
-    assert response.status_code == 403
+    async def run_test():
+        try:
+            await main.mcp_stream(FakeRequest(headers={}))
+        except main.HTTPException as exc:
+            assert exc.status_code == 403
+        else:
+            assert False, "Expected HTTPException"
+
+    asyncio.run(run_test())
 
 
 def test_mcp_stream_initial_event():
@@ -178,11 +191,70 @@ def test_mcp_stream_initial_event():
 
 
 def test_mcp_post_invalid_origin():
-    response = client.post("/mcp", json={}, headers={"Origin": "http://evil.com"})
-    assert response.status_code == 403
+    async def run_test():
+        try:
+            await main.mcp_message(FakeRequest({}, headers={"origin": "http://evil.com"}))
+        except main.HTTPException as exc:
+            assert exc.status_code == 403
+        else:
+            assert False, "Expected HTTPException"
+
+    asyncio.run(run_test())
 
 
 def test_mcp_post_missing_origin():
+
+    async def run_test():
+        try:
+            await main.mcp_message(FakeRequest({"method": "initialize"}, headers={}))
+        except main.HTTPException as exc:
+            assert exc.status_code == 403
+        else:
+            assert False, "Expected HTTPException"
+
+    asyncio.run(run_test())
+
+
+def test_post_cast_missing_token(monkeypatch):
+    monkeypatch.setattr(main.warpcast_api, "has_token", lambda: False)
+    try:
+        main.post_cast(main.CastRequest(text="hi"))
+    except main.HTTPException as exc:
+        assert exc.status_code == 500
+    else:
+        assert False, "Expected HTTPException"
+
+
+def test_mcp_post_unknown_method():
+    async def run_test():
+        try:
+            await main.mcp_message(FakeRequest({"method": "unknown"}))
+        except main.HTTPException as exc:
+            assert exc.status_code == 404
+        else:
+            assert False, "Expected HTTPException"
+
+    asyncio.run(run_test())
+
+
+def test_mcp_post_invalid_json():
+    class BadRequest:
+        def __init__(self):
+            self.headers = {"origin": "http://localhost"}
+
+        async def json(self):
+            raise json.JSONDecodeError("bad", "bad", 0)
+
+    async def run_test():
+        try:
+            await main.mcp_message(BadRequest())
+        except main.HTTPException as exc:
+            assert exc.status_code == 400
+        else:
+            assert False, "Expected HTTPException"
+
+    asyncio.run(run_test())
+
     response = client.post("/mcp", json={"method": "initialize"})
     assert response.status_code == 403
 
@@ -197,3 +269,4 @@ def test_auth_helpers_environment(monkeypatch):
     monkeypatch.setenv("WARPCAST_API_TOKEN", "secret")
     assert warpcast_api.has_token()
     assert warpcast_api._auth_headers() == {"Authorization": "Bearer secret"}
+

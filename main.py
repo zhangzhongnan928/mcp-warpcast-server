@@ -152,8 +152,12 @@ async def mcp_message(request: Request):
     if not origin or not _origin_allowed(origin):
         logger.info("Origin not allowed")
         raise HTTPException(status_code=403)
-    message = await request.json()
-    logger.debug("Received message: %s", message)
+    try:
+        message = await request.json()
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    print(f"Received message: {message}", file=sys.stderr)
+
 
     if message.get("method") == "initialize":
         if not mcp_queues:
