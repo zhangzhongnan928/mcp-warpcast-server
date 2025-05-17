@@ -149,10 +149,12 @@ JSON-RPC message. The response on the event stream includes
 
 ### Initialization example
 
-In one terminal start listening for events:
+In one terminal start listening for events (the request **must** include an
+`Origin` header matching `localhost` or a value listed in `ALLOWED_ORIGINS`):
 
 ```bash
-curl -N http://localhost:8000/mcp
+curl -N http://localhost:8000/mcp \
+     -H "Origin: http://localhost"
 ```
 
 In another terminal send the `initialize` message:
