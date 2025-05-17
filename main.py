@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import logging
+from typing import Optional
+
 import warpcast_api
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,21 @@ class CastRequest(BaseModel):
 
 class ChannelRequest(BaseModel):
     channel_id: str
+
+
+class HandshakeRequest(BaseModel):
+    """Payload for MCP handshake."""
+    client: Optional[str] = None
+    protocol_version: str = "0.1"
+
+
+@app.post("/handshake")
+def handshake(req: HandshakeRequest):
+    """Basic MCP handshake endpoint."""
+    return {
+        "server": "warpcast-mcp-server",
+        "protocol_version": req.protocol_version,
+    }
 
 
 @app.post("/post-cast")
