@@ -1,4 +1,4 @@
 fastapi[testclient]
 uvicorn
-requests
+httpx
 pytest
