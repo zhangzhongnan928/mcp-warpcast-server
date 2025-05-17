@@ -79,8 +79,13 @@ An additional `/mcp` route implements the [Model Context Protocol](https://model
    ```bash
    uvicorn main:app --reload
    ```
-2. Open a Server-Sent Events connection to `http://localhost:8000/mcp`.
-3. POST JSON-RPC messages (such as the `initialize` request) to the same path.
+2. Open a Server-Sent Events connection to `http://localhost:8000/mcp`. The request must include an `Origin` header. The server accepts connections from `localhost` and any hosts listed in `ALLOWED_ORIGINS`:
+
+```bash
+export ALLOWED_ORIGINS="file://,https://myapp.com"
+```
+
+3. Once the stream is open, POST JSON-RPC messages (such as the `initialize` request) to the same path. The server rejects JSON-RPC messages until an SSE connection is established.
 
 After initialization clients can discover the Warpcast tools using the `tools/list` method.
 
