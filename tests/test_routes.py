@@ -1,5 +1,10 @@
 import asyncio
 import json
+import sys
+
+import requests_stub
+
+sys.modules["requests"] = requests_stub
 
 import main
 from fastapi.testclient import TestClient
