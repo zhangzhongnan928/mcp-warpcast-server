@@ -97,6 +97,7 @@ Follow these steps to access the Warpcast tools from Claude's desktop applicatio
 
 4. Save the file and restart Claude Desktop. You should now see a hammer icon in the chat input that lets you use the Warpcast tools.
 
+
 ## MCP Compatibility
 
 This server is compatible with the [Model Context Protocol](https://modelcontextprotocol.org/).
@@ -126,3 +127,6 @@ curl -X POST http://localhost:8000/post-cast \
      -H "Content-Type: application/json" \
      -d '{"text":"Hello from curl"}'
 ```
+## License
+
+This project is licensed under the [MIT License](LICENSE).
