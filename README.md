@@ -43,11 +43,16 @@ This MCP server provides several tools that Claude can use:
 
 ## Setup
 
-1. Install dependencies:
+1. Create a Python virtual environment (Python 3.11 or newer is recommended):
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-2. Obtain a Warpcast API token and export it as an environment variable:
+3. Obtain a Warpcast API token and export it as an environment variable:
    - Log in to [Warpcast](https://warpcast.com/) and open **Settings \> Developer**.
    - Click **Create API Token** and copy the value.
    - Set `WARPCAST_API_TOKEN` in your shell:
@@ -59,7 +64,7 @@ This MCP server provides several tools that Claude can use:
    You can either set the `WARPCAST_API_TOKEN` environment variable or supply it
    in the `env` section of Claude's configuration (see below).
    
-3. Start the server:
+4. Start the server:
    ```bash
    uvicorn main:app --reload
    ```
@@ -113,11 +118,14 @@ Follow these steps to access the Warpcast tools from Claude's desktop applicatio
 
 ## Running Tests
 
-Unit tests are written with `pytest` and use FastAPI's `TestClient`. To run them:
+Unit tests are written with `pytest` and use FastAPI's `TestClient` (installed via `fastapi[testclient]`).
+Create a virtual environment, install dependencies and run the suite:
 
 ```bash
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-pytest
+make test        # or simply `pytest`
 ```
 
 The tests mock the Warpcast API layer so no network connection is required.
