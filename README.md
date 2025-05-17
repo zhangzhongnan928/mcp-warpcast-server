@@ -11,7 +11,8 @@ A Model Context Protocol (MCP) server for Warpcast integration that allows you t
 - Follow/unfollow channels
 - Get trending casts
 
-
+Warpcast API 
+https://docs.farcaster.xyz/reference/warpcast/api
 
 ## Usage
 
