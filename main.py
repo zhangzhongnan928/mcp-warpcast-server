@@ -115,8 +115,6 @@ async def mcp_stream(request: Request):
     origin = request.headers.get("origin")
     if not origin or not _origin_allowed(origin):
         raise HTTPException(status_code=403)
-    global mcp_queue
-
     queue = asyncio.Queue()
     mcp_queues.add(queue)
     return StreamingResponse(_event_generator(queue), media_type="text/event-stream")
