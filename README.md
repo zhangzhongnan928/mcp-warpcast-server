@@ -96,3 +96,15 @@ Follow these steps to access the Warpcast tools from Claude's desktop applicatio
 ```
 
 4. Save the file and restart Claude Desktop. You should now see a hammer icon in the chat input that lets you use the Warpcast tools.
+
+## Running Tests
+
+Unit tests are written with `pytest` and use FastAPI's `TestClient`. To run them:
+
+```bash
+pip install -r requirements.txt
+pytest
+```
+
+The tests mock the Warpcast API layer so no network connection is required.
+
