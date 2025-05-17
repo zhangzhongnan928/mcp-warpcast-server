@@ -54,9 +54,10 @@ This MCP server provides several tools that Claude can use:
      ```bash
      export WARPCAST_API_TOKEN=YOUR_TOKEN
      ```
- You can either set the
-   `WARPCAST_API_TOKEN` environment variable or supply it in the `env`
-   section of Claude's configuration (see below).
+   The server validates this variable on startup. If it is missing, a warning
+   is logged and authorized requests will respond with **HTTP 500** errors.
+   You can either set the `WARPCAST_API_TOKEN` environment variable or supply it
+   in the `env` section of Claude's configuration (see below).
    
 3. Start the server:
    ```bash

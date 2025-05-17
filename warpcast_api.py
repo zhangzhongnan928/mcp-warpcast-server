@@ -7,6 +7,11 @@ API_BASE_URL = "https://api.warpcast.com/v2"
 API_TOKEN = os.getenv("WARPCAST_API_TOKEN")
 
 
+def has_token() -> bool:
+    """Return True if the API token is configured."""
+    return bool(API_TOKEN)
+
+
 def _auth_headers() -> Dict[str, str]:
     if not API_TOKEN:
         return {}
