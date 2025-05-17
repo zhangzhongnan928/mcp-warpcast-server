@@ -65,6 +65,19 @@ This MCP server provides several tools that Claude can use:
 
 The server exposes HTTP endpoints matching the tools listed above.
 
+### MCP Endpoint
+
+An additional `/mcp` route implements the [Model Context Protocol](https://modelcontextprotocol.io/). To use it:
+
+1. Start the server as usual:
+   ```bash
+   uvicorn main:app --reload
+   ```
+2. Open a Server-Sent Events connection to `http://localhost:8000/mcp`.
+3. POST JSON-RPC messages (such as the `initialize` request) to the same path.
+
+After initialization clients can discover the Warpcast tools using the `tools/list` method.
+
 ## Using with Claude Desktop
 
 Follow these steps to access the Warpcast tools from Claude's desktop application:
