@@ -121,6 +121,7 @@ Follow these steps to access the Warpcast tools from Claude's desktop applicatio
 ```
 
 Specifying a `url` tells Claude Desktop to communicate with the server over HTTP using Server-Sent Events instead of standard input and output.
+If you omit `url`, Claude Desktop defaults to communicating via standard input and output (stdio), which will not work with this server.
 
 4. Save the file and restart Claude Desktop. You should now see a hammer icon in the chat input that lets you use the Warpcast tools.
 
