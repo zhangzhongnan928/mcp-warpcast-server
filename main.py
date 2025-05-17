@@ -3,6 +3,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import asyncio
 import json
+import os
+from urllib.parse import urlparse
 
 import logging
 from typing import Optional
@@ -15,6 +17,21 @@ app = FastAPI(title="Warpcast MCP Server")
 
 # Queues for SSE communication (one per connection)
 mcp_queues: set[asyncio.Queue] = set()
+
+# Allowed origins for SSE connections
+ALLOWED_ORIGINS = {
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+}
+
+
+def _origin_allowed(origin: str) -> bool:
+    """Return True if the origin is localhost or in ALLOWED_ORIGINS."""
+    if origin in ALLOWED_ORIGINS:
+        return True
+    parsed = urlparse(origin)
+    return parsed.hostname in {"localhost", "127.0.0.1"}
 
 # Tool definitions exposed via MCP
 TOOLS = [
@@ -93,8 +110,13 @@ async def _event_generator(queue: asyncio.Queue):
 
 
 @app.get("/mcp")
-async def mcp_stream():
+async def mcp_stream(request: Request):
     """Establish an SSE connection for MCP messages."""
+    origin = request.headers.get("origin")
+    if not origin or not _origin_allowed(origin):
+        raise HTTPException(status_code=403)
+    global mcp_queue
+
     queue = asyncio.Queue()
     mcp_queues.add(queue)
     return StreamingResponse(_event_generator(queue), media_type="text/event-stream")
@@ -136,19 +158,6 @@ async def mcp_message(request: Request):
 
     raise HTTPException(status_code=404, detail="Method not found")
     
-class HandshakeRequest(BaseModel):
-    """Payload for MCP handshake."""
-    client: Optional[str] = None
-    protocol_version: str = "0.1"
-
-
-@app.post("/handshake")
-def handshake(req: HandshakeRequest):
-    """Basic MCP handshake endpoint."""
-    return {
-        "server": "warpcast-mcp-server",
-        "protocol_version": req.protocol_version,
-    }
 
 @app.post("/post-cast")
 def post_cast(req: CastRequest):

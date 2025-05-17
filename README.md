@@ -43,11 +43,16 @@ This MCP server provides several tools that Claude can use:
 
 ## Setup
 
-1. Install dependencies:
+1. Create a Python virtual environment (Python 3.11 or newer is recommended):
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-2. Obtain a Warpcast API token and export it as an environment variable:
+3. Obtain a Warpcast API token and export it as an environment variable:
    - Log in to [Warpcast](https://warpcast.com/) and open **Settings \> Developer**.
    - Click **Create API Token** and copy the value.
    - Set `WARPCAST_API_TOKEN` in your shell:
@@ -59,7 +64,7 @@ This MCP server provides several tools that Claude can use:
    You can either set the `WARPCAST_API_TOKEN` environment variable or supply it
    in the `env` section of Claude's configuration (see below).
    
-3. Start the server:
+4. Start the server:
    ```bash
    uvicorn main:app --reload
    ```
@@ -113,11 +118,14 @@ Follow these steps to access the Warpcast tools from Claude's desktop applicatio
 
 ## Running Tests
 
-Unit tests are written with `pytest` and use FastAPI's `TestClient`. To run them:
+Unit tests are written with `pytest` and use FastAPI's `TestClient` (installed via `fastapi[testclient]`).
+Create a virtual environment, install dependencies and run the suite:
 
 ```bash
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-pytest
+make test        # or simply `pytest`
 ```
 
 The tests mock the Warpcast API layer so no network connection is required.
@@ -126,26 +134,29 @@ The tests mock the Warpcast API layer so no network connection is required.
 ## MCP Compatibility
 
 This server is compatible with the [Model Context Protocol](https://modelcontextprotocol.org/).
-MCP clients must perform a handshake before using any tools. The handshake
-confirms the protocol version and lets the client discover available endpoints.
+After opening a Server-Sent Events connection to `/mcp`, send an `initialize`
+JSON-RPC message. The response on the event stream includes
+`{"protocolVersion": "2024-11-05"}` which confirms compatibility.
 
-### Handshake example
+### Initialization example
 
-Start the server and issue a `POST` request to `/handshake`:
+In one terminal start listening for events:
 
 ```bash
-curl -X POST http://localhost:8000/handshake \
+curl -N http://localhost:8000/mcp
+```
+
+In another terminal send the `initialize` message:
+
+```bash
+curl -X POST http://localhost:8000/mcp \
      -H "Content-Type: application/json" \
-     -d '{"client": "curl", "protocol_version": "0.1"}'
+     -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
 ```
 
-The server will respond with its protocol version:
+The server responds on the first terminal with the protocol version.
 
-```json
-{"server":"warpcast-mcp-server","protocol_version":"0.1"}
-```
-
-After the handshake you can call tool endpoints, for example to post a cast:
+After initialization you can call tool endpoints, for example to post a cast:
 
 ```bash
 curl -X POST http://localhost:8000/post-cast \

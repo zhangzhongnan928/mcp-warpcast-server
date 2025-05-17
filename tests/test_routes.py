@@ -113,3 +113,20 @@ def test_mcp_multiple_streams():
         await gen2.aclose()
         assert not main.mcp_queues
     asyncio.run(run_test())
+
+    response = client.post("/unfollow-channel", json={"channel_id": "xyz"})
+    assert response.status_code == 200
+    assert response.json() == {"status": "success", "channel": "xyz"}
+
+
+def test_handshake_removed():
+    response = client.post("/handshake", json={})
+    assert response.status_code == 404
+
+    def test_mcp_stream_invalid_origin():
+    response = client.get("/mcp", headers={"Origin": "http://evil.com"})
+    assert response.status_code == 403
+
+def test_mcp_stream_missing_origin():
+    response = client.get("/mcp")
+    assert response.status_code == 403
