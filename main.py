@@ -1,5 +1,7 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse, JSONResponse
+
+from fastmcp_stub import FastMCP
 from pydantic import BaseModel
 import asyncio
 import json
@@ -15,7 +17,8 @@ import warpcast_api
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Warpcast MCP Server")
+mcp = FastMCP("Warpcast MCP Server")
+app = mcp.app
 
 # Queues for SSE communication (one per connection)
 mcp_queues: set[asyncio.Queue] = set()
@@ -47,45 +50,7 @@ def _origin_allowed(origin: str) -> bool:
         return True
     return parsed.hostname in {"localhost", "127.0.0.1"}
 
-# Tool definitions exposed via MCP
-TOOLS = [
-    {
-        "name": "post-cast",
-        "description": "Create a new post on Warpcast (max 320 characters)",
-    },
-    {
-        "name": "get-user-casts",
-        "description": "Retrieve recent casts from a specific user",
-    },
-    {
-        "name": "search-casts",
-        "description": "Search for casts by keyword or phrase",
-    },
-    {
-        "name": "get-trending-casts",
-        "description": "Get the currently trending casts on Warpcast",
-    },
-    {
-        "name": "get-all-channels",
-        "description": "List available channels on Warpcast",
-    },
-    {
-        "name": "get-channel",
-        "description": "Get information about a specific channel",
-    },
-    {
-        "name": "get-channel-casts",
-        "description": "Get casts from a specific channel",
-    },
-    {
-        "name": "follow-channel",
-        "description": "Follow a channel",
-    },
-    {
-        "name": "unfollow-channel",
-        "description": "Unfollow a channel",
-    },
-]
+
 
 
 @app.on_event("startup")
@@ -204,7 +169,7 @@ async def mcp_message(request: Request):
         response = {
             "jsonrpc": "2.0",
             "id": message.get("id"),
-            "result": {"tools": TOOLS, "nextCursor": None},
+            "result": {"tools": mcp.tools, "nextCursor": None},
         }
         
         # Send the response back through all connected queues
@@ -221,17 +186,9 @@ async def mcp_message(request: Request):
 
     else:
         logger.error(f"Unknown method: {method}")
-        error_response = {
-            "jsonrpc": "2.0",
-            "id": message.get("id"),
-            "error": {
-                "code": -32601,
-                "message": f"Method not found: {method}"
-            }
-        }
-        return JSONResponse(content=error_response)
+        raise HTTPException(status_code=404, detail="Method not found")
 
-@app.post("/post-cast")
+@mcp.tool()
 async def post_cast(req: CastRequest):
     ensure_token()
     result = await warpcast_api.post_cast(req.text)
@@ -240,43 +197,43 @@ async def post_cast(req: CastRequest):
     return result
 
 
-@app.get("/user-casts/{username}")
+@mcp.tool()
 async def user_casts(username: str, limit: int = 20):
     ensure_token()
     return await warpcast_api.get_user_casts(username, limit)
 
 
-@app.get("/search-casts")
+@mcp.tool()
 async def search_casts(q: str, limit: int = 20):
     ensure_token()
     return await warpcast_api.search_casts(q, limit)
 
 
-@app.get("/trending-casts")
+@mcp.tool()
 async def trending_casts(limit: int = 20):
     ensure_token()
     return await warpcast_api.get_trending_casts(limit)
 
 
-@app.get("/channels")
+@mcp.tool()
 async def all_channels():
     ensure_token()
     return await warpcast_api.get_all_channels()
 
 
-@app.get("/channels/{channel_id}")
+@mcp.tool()
 async def get_channel(channel_id: str):
     ensure_token()
     return await warpcast_api.get_channel(channel_id)
 
 
-@app.get("/channels/{channel_id}/casts")
+@mcp.tool()
 async def channel_casts(channel_id: str, limit: int = 20):
     ensure_token()
     return await warpcast_api.get_channel_casts(channel_id, limit)
 
 
-@app.post("/follow-channel")
+@mcp.tool()
 async def follow_channel(req: ChannelRequest):
     ensure_token()
     result = await warpcast_api.follow_channel(req.channel_id)
@@ -285,7 +242,7 @@ async def follow_channel(req: ChannelRequest):
     return result
 
 
-@app.post("/unfollow-channel")
+@mcp.tool()
 async def unfollow_channel(req: ChannelRequest):
     ensure_token()
     result = await warpcast_api.unfollow_channel(req.channel_id)

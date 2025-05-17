@@ -17,6 +17,21 @@ class MonkeyPatch:
         self._actions.append((mapping, key, orig, True if key in mapping else False))
         mapping[key] = value
 
+    def setenv(self, key, value):
+        orig = os.environ.get(key)
+        existed = key in os.environ
+        self._actions.append((os.environ, key, orig, existed))
+        os.environ[key] = value
+
+    def delenv(self, key, raising=True):
+        existed = key in os.environ
+        orig = os.environ.get(key)
+        if existed:
+            del os.environ[key]
+        elif raising:
+            raise KeyError(key)
+        self._actions.append((os.environ, key, orig, existed))
+
     def undo(self):
         for item in reversed(self._actions):
             if len(item) == 3:

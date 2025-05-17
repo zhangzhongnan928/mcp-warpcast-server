@@ -1,6 +1,7 @@
 # Warpcast MCP Server
 
-A Model Context Protocol (MCP) server for Warpcast integration that allows you to use Claude to interact with your Warpcast account.
+A Model Context Protocol (MCP) server for Warpcast integration that allows you to use Claude to interact with your Warpcast account.  
+The implementation now follows the [FastMCP](https://modelcontextprotocol.io) style server from the MCP Python SDK. A small stub of the SDK is bundled so the project can run without external dependencies.
 
 ## Features
 

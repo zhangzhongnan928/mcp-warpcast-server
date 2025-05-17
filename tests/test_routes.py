@@ -218,7 +218,7 @@ def test_mcp_post_missing_origin():
 def test_post_cast_missing_token(monkeypatch):
     monkeypatch.setattr(main.warpcast_api, "has_token", lambda: False)
     try:
-        main.post_cast(main.CastRequest(text="hi"))
+        asyncio.run(main.post_cast(main.CastRequest(text="hi")))
     except main.HTTPException as exc:
         assert exc.status_code == 500
     else:
@@ -255,8 +255,6 @@ def test_mcp_post_invalid_json():
 
     asyncio.run(run_test())
 
-    response = client.post("/mcp", json={"method": "initialize"})
-    assert response.status_code == 403
 
 
 def test_auth_helpers_environment(monkeypatch):
