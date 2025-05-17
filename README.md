@@ -111,6 +111,7 @@ Follow these steps to access the Warpcast tools from Claude's desktop applicatio
         "--port",
         "8000"
       ],
+      "url": "http://localhost:8000/mcp",
       "env": {
         "WARPCAST_API_TOKEN": "YOUR_API_TOKEN"
       }
@@ -118,6 +119,8 @@ Follow these steps to access the Warpcast tools from Claude's desktop applicatio
   }
 }
 ```
+
+Specifying a `url` tells Claude Desktop to communicate with the server over HTTP using Server-Sent Events instead of standard input and output.
 
 4. Save the file and restart Claude Desktop. You should now see a hammer icon in the chat input that lets you use the Warpcast tools.
 
