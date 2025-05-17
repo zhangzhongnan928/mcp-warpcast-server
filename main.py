@@ -140,7 +140,7 @@ async def mcp_stream(request: Request):
         raise HTTPException(status_code=403)
     queue = asyncio.Queue()
     mcp_queues.add(queue)
-    await queue.put({"event": "endpoint", "data": "/mcp"})
+    await queue.put({"event": "endpoint", "data": {"uri": "/mcp"}})
     return StreamingResponse(_event_generator(queue), media_type="text/event-stream")
 
 
