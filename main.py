@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import asyncio
 import json
 import os
+import sys  # Add import for sys
 from urllib.parse import urlparse
 
 import logging
@@ -156,8 +157,9 @@ async def mcp_message(request: Request):
         message = await request.json()
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
-    print(f"Received message: {message}", file=sys.stderr)
-
+    
+    # Use logger instead of print to stderr
+    logger.info(f"Received message: {message}")
 
     if message.get("method") == "initialize":
         if not mcp_queues:
