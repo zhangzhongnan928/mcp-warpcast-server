@@ -16,7 +16,8 @@ https://docs.farcaster.xyz/reference/warpcast/api
 
 ## Usage
 
-Once configured, you can ask Claude to:
+`mcp-warpcast-server` is usually launched automatically by Claude Desktop's MCP client when the Warpcast tools are configured.
+After the server starts you can ask Claude to:
 
 - "Post a cast about [topic]"
 - "Read the latest casts from [username]"
@@ -43,6 +44,9 @@ This MCP server provides several tools that Claude can use:
 
 ## Setup
 
+
+Claude Desktop normally launches this server for you when the Warpcast tools are configured. The steps below are only needed if you want to run the server manually for development.
+
 1. Create a Python virtual environment (Python 3.11 or newer is recommended):
    ```bash
    python3 -m venv venv
@@ -52,19 +56,18 @@ This MCP server provides several tools that Claude can use:
    ```bash
    pip install -r requirements.txt
    ```
-3. Obtain a Warpcast API token and export it as an environment variable:
-   - Log in to [Warpcast](https://warpcast.com/) and open **Settings \> Developer**.
+3. Provide a Warpcast API token:
+   - Log in to [Warpcast](https://warpcast.com/) and open **Settings > Developer**.
    - Click **Create API Token** and copy the value.
-   - Set `WARPCAST_API_TOKEN` in your shell:
+   - Add `WARPCAST_API_TOKEN` under the `env` section of your Claude desktop configuration.
+   - If starting the server manually, you can instead export the token in your shell:
      ```bash
      export WARPCAST_API_TOKEN=YOUR_TOKEN
      ```
    The server validates this variable on startup. If it is missing, a warning
    is logged and authorized requests will respond with **HTTP 500** errors.
-   You can either set the `WARPCAST_API_TOKEN` environment variable or supply it
-   in the `env` section of Claude's configuration (see below).
-   
-4. Start the server:
+
+4. (Optional) Start the server manually:
    ```bash
    uvicorn main:app --reload
    ```

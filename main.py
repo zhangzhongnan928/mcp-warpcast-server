@@ -4,7 +4,6 @@ from pydantic import BaseModel
 import asyncio
 import json
 import os
-import sys
 from urllib.parse import urlparse
 
 import logging
@@ -12,6 +11,7 @@ from typing import Optional
 
 import warpcast_api
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Warpcast MCP Server")
@@ -116,7 +116,7 @@ async def _event_generator(queue: asyncio.Queue):
     try:
         while True:
             data = await queue.get()
-            print(f"SSE send: {data}", file=sys.stderr)
+            logger.debug("SSE send: %s", data)
             if isinstance(data, dict) and "event" in data and "data" in data:
                 event = data["event"]
                 payload = data["data"]
@@ -126,7 +126,7 @@ async def _event_generator(queue: asyncio.Queue):
             yield f"event: {event}\ndata: {json.dumps(payload)}\n\n"
     finally:
         # Connection closed
-        print("SSE connection closed", file=sys.stderr)
+        logger.info("SSE connection closed")
         mcp_queues.discard(queue)
 
 
@@ -134,13 +134,13 @@ async def _event_generator(queue: asyncio.Queue):
 async def mcp_stream(request: Request):
     """Establish an SSE connection for MCP messages."""
     origin = request.headers.get("origin")
-    print(f"/mcp GET from origin: {origin}", file=sys.stderr)
+    logger.info("/mcp GET from origin: %s", origin)
     if not origin or not _origin_allowed(origin):
-        print("Origin not allowed", file=sys.stderr)
+        logger.info("Origin not allowed")
         raise HTTPException(status_code=403)
     queue = asyncio.Queue()
     mcp_queues.add(queue)
-    await queue.put({"event": "endpoint", "data": "/mcp"})
+    await queue.put({"event": "endpoint", "data": {"uri": "/mcp"}})
     return StreamingResponse(_event_generator(queue), media_type="text/event-stream")
 
 
@@ -148,15 +148,16 @@ async def mcp_stream(request: Request):
 async def mcp_message(request: Request):
     """Handle JSON-RPC messages sent by the client."""
     origin = request.headers.get("origin")
-    print(f"/mcp POST from origin: {origin}", file=sys.stderr)
+    logger.info("/mcp POST from origin: %s", origin)
     if not origin or not _origin_allowed(origin):
-        print("Origin not allowed", file=sys.stderr)
+        logger.info("Origin not allowed")
         raise HTTPException(status_code=403)
     try:
         message = await request.json()
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
     print(f"Received message: {message}", file=sys.stderr)
+
 
     if message.get("method") == "initialize":
         if not mcp_queues:
@@ -172,7 +173,7 @@ async def mcp_message(request: Request):
             },
         }
         for q in list(mcp_queues):
-            print("Sending initialize response", file=sys.stderr)
+            logger.debug("Sending initialize response")
             await q.put(response)
         return {"status": "ok"}
 
@@ -185,7 +186,7 @@ async def mcp_message(request: Request):
             "result": {"tools": TOOLS, "nextCursor": None},
         }
         for q in list(mcp_queues):
-            print("Sending tools/list response", file=sys.stderr)
+            logger.debug("Sending tools/list response")
             await q.put(response)
         return {"status": "ok"}
 
@@ -193,63 +194,63 @@ async def mcp_message(request: Request):
     
 
 @app.post("/post-cast")
-def post_cast(req: CastRequest):
+async def post_cast(req: CastRequest):
     ensure_token()
-    result = warpcast_api.post_cast(req.text)
+    result = await warpcast_api.post_cast(req.text)
     if result.get("status") == "error":
         raise HTTPException(status_code=400, detail=result["message"])
     return result
 
 
 @app.get("/user-casts/{username}")
-def user_casts(username: str, limit: int = 20):
+async def user_casts(username: str, limit: int = 20):
     ensure_token()
-    return warpcast_api.get_user_casts(username, limit)
+    return await warpcast_api.get_user_casts(username, limit)
 
 
 @app.get("/search-casts")
-def search_casts(q: str, limit: int = 20):
+async def search_casts(q: str, limit: int = 20):
     ensure_token()
-    return warpcast_api.search_casts(q, limit)
+    return await warpcast_api.search_casts(q, limit)
 
 
 @app.get("/trending-casts")
-def trending_casts(limit: int = 20):
+async def trending_casts(limit: int = 20):
     ensure_token()
-    return warpcast_api.get_trending_casts(limit)
+    return await warpcast_api.get_trending_casts(limit)
 
 
 @app.get("/channels")
-def all_channels():
+async def all_channels():
     ensure_token()
-    return warpcast_api.get_all_channels()
+    return await warpcast_api.get_all_channels()
 
 
 @app.get("/channels/{channel_id}")
-def get_channel(channel_id: str):
+async def get_channel(channel_id: str):
     ensure_token()
-    return warpcast_api.get_channel(channel_id)
+    return await warpcast_api.get_channel(channel_id)
 
 
 @app.get("/channels/{channel_id}/casts")
-def channel_casts(channel_id: str, limit: int = 20):
+async def channel_casts(channel_id: str, limit: int = 20):
     ensure_token()
-    return warpcast_api.get_channel_casts(channel_id, limit)
+    return await warpcast_api.get_channel_casts(channel_id, limit)
 
 
 @app.post("/follow-channel")
-def follow_channel(req: ChannelRequest):
+async def follow_channel(req: ChannelRequest):
     ensure_token()
-    result = warpcast_api.follow_channel(req.channel_id)
+    result = await warpcast_api.follow_channel(req.channel_id)
     if result.get("status") == "error":
         raise HTTPException(status_code=400, detail=result["message"])
     return result
 
 
 @app.post("/unfollow-channel")
-def unfollow_channel(req: ChannelRequest):
+async def unfollow_channel(req: ChannelRequest):
     ensure_token()
-    result = warpcast_api.unfollow_channel(req.channel_id)
+    result = await warpcast_api.unfollow_channel(req.channel_id)
     if result.get("status") == "error":
         raise HTTPException(status_code=400, detail=result["message"])
     return result
