@@ -103,7 +103,13 @@ async def _event_generator(queue: asyncio.Queue):
     try:
         while True:
             data = await queue.get()
-            yield f"data: {json.dumps(data)}\n\n"
+            if isinstance(data, dict) and "event" in data and "data" in data:
+                event = data["event"]
+                payload = data["data"]
+            else:
+                event = "message"
+                payload = data
+            yield f"event: {event}\ndata: {json.dumps(payload)}\n\n"
     finally:
         # Connection closed
         mcp_queues.discard(queue)
@@ -117,6 +123,7 @@ async def mcp_stream(request: Request):
         raise HTTPException(status_code=403)
     queue = asyncio.Queue()
     mcp_queues.add(queue)
+    await queue.put({"event": "endpoint", "data": "/mcp"})
     return StreamingResponse(_event_generator(queue), media_type="text/event-stream")
 
 

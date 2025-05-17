@@ -110,7 +110,9 @@ def test_mcp_multiple_streams():
         data1 = await next1
         data2 = await next2
         assert data1 == data2
-        payload = json.loads(data1.split("data: ")[1])
+        lines = data1.splitlines()
+        assert lines[0] == "event: message"
+        payload = json.loads(lines[1].split("data: ")[1])
         assert payload["result"]["protocolVersion"] == "2024-11-05"
         await gen1.aclose()
         await gen2.aclose()
@@ -131,3 +133,23 @@ def test_mcp_stream_invalid_origin():
 def test_mcp_stream_missing_origin():
     response = client.get("/mcp")
     assert response.status_code == 403
+
+
+def test_mcp_stream_initial_event():
+    async def run_test():
+        main.mcp_queues.clear()
+        class Req:
+            def __init__(self):
+                self.headers = {"origin": "http://localhost"}
+
+        # Establish the stream (but don't consume the returned StreamingResponse)
+        await main.mcp_stream(Req())
+        assert len(main.mcp_queues) == 1
+        queue = next(iter(main.mcp_queues))
+        gen = main._event_generator(queue)
+        first = await gen.__anext__()
+        assert first.startswith("event: endpoint")
+        await gen.aclose()
+        assert not main.mcp_queues
+
+    asyncio.run(run_test())
