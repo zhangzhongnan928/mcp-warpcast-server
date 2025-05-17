@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import asyncio
 import json
 import os
+import sys
 from urllib.parse import urlparse
 
 import logging
@@ -18,19 +19,31 @@ app = FastAPI(title="Warpcast MCP Server")
 # Queues for SSE communication (one per connection)
 mcp_queues: set[asyncio.Queue] = set()
 
-# Allowed origins for SSE connections
+# Allowed origins for SSE connections. We include some common defaults so
+# Claude Desktop can connect out of the box.
 ALLOWED_ORIGINS = {
     o.strip()
-    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    for o in os.getenv(
+        "ALLOWED_ORIGINS",
+        "claude://desktop.claude.ai,https://claude.ai,http://localhost:3000",
+    ).split(",")
     if o.strip()
 }
 
 
 def _origin_allowed(origin: str) -> bool:
     """Return True if the origin is localhost or in ALLOWED_ORIGINS."""
+    if not origin:
+        return False
     if origin in ALLOWED_ORIGINS:
         return True
-    parsed = urlparse(origin)
+    try:
+        parsed = urlparse(origin)
+    except ValueError:
+        return False
+    # Allow localhost, loopback and file URLs used by desktop clients
+    if parsed.scheme == "file":
+        return True
     return parsed.hostname in {"localhost", "127.0.0.1"}
 
 # Tool definitions exposed via MCP
@@ -103,6 +116,7 @@ async def _event_generator(queue: asyncio.Queue):
     try:
         while True:
             data = await queue.get()
+            print(f"SSE send: {data}", file=sys.stderr)
             if isinstance(data, dict) and "event" in data and "data" in data:
                 event = data["event"]
                 payload = data["data"]
@@ -112,6 +126,7 @@ async def _event_generator(queue: asyncio.Queue):
             yield f"event: {event}\ndata: {json.dumps(payload)}\n\n"
     finally:
         # Connection closed
+        print("SSE connection closed", file=sys.stderr)
         mcp_queues.discard(queue)
 
 
@@ -119,7 +134,9 @@ async def _event_generator(queue: asyncio.Queue):
 async def mcp_stream(request: Request):
     """Establish an SSE connection for MCP messages."""
     origin = request.headers.get("origin")
+    print(f"/mcp GET from origin: {origin}", file=sys.stderr)
     if not origin or not _origin_allowed(origin):
+        print("Origin not allowed", file=sys.stderr)
         raise HTTPException(status_code=403)
     queue = asyncio.Queue()
     mcp_queues.add(queue)
@@ -131,9 +148,12 @@ async def mcp_stream(request: Request):
 async def mcp_message(request: Request):
     """Handle JSON-RPC messages sent by the client."""
     origin = request.headers.get("origin")
+    print(f"/mcp POST from origin: {origin}", file=sys.stderr)
     if not origin or not _origin_allowed(origin):
+        print("Origin not allowed", file=sys.stderr)
         raise HTTPException(status_code=403)
     message = await request.json()
+    print(f"Received message: {message}", file=sys.stderr)
 
     if message.get("method") == "initialize":
         if not mcp_queues:
@@ -149,6 +169,7 @@ async def mcp_message(request: Request):
             },
         }
         for q in list(mcp_queues):
+            print("Sending initialize response", file=sys.stderr)
             await q.put(response)
         return {"status": "ok"}
 
@@ -161,6 +182,7 @@ async def mcp_message(request: Request):
             "result": {"tools": TOOLS, "nextCursor": None},
         }
         for q in list(mcp_queues):
+            print("Sending tools/list response", file=sys.stderr)
             await q.put(response)
         return {"status": "ok"}
 
