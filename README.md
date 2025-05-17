@@ -40,3 +40,17 @@ This MCP server provides several tools that Claude can use:
 8. **follow-channel**: Follow a channel
 9. **unfollow-channel**: Unfollow a channel
 
+
+## Setup
+
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Set the `WARPCAST_API_TOKEN` environment variable with your API token.
+3. Start the server:
+   ```bash
+   uvicorn main:app --reload
+   ```
+
+The server exposes HTTP endpoints matching the tools listed above.
