@@ -1,22 +1,10 @@
 import asyncio
-import json
 import sys
 
 import httpx_stub
 sys.modules["httpx"] = httpx_stub
 
 import main
-
-# Helper request object for mcp_message
-class FakeRequest:
-    def __init__(self, payload=None, headers=None):
-        self._payload = payload or {}
-        if headers is None:
-            headers = {"origin": "http://localhost"}
-        self.headers = headers
-
-    async def json(self):
-        return self._payload
 
 
 def test_post_cast(monkeypatch):
@@ -118,103 +106,6 @@ def test_unfollow_channel(monkeypatch):
     assert result == {"status": "success", "channel": "xyz"}
 
 
-def test_mcp_multiple_streams():
-    async def run_test():
-        q1 = asyncio.Queue()
-        q2 = asyncio.Queue()
-        main.mcp_queues.add(q1)
-        main.mcp_queues.add(q2)
-        gen1 = main._event_generator(q1)
-        gen2 = main._event_generator(q2)
-        next1 = asyncio.create_task(gen1.__anext__())
-        next2 = asyncio.create_task(gen2.__anext__())
-        await main.mcp_message(FakeRequest({"method": "initialize", "id": 1}))
-        data1 = await next1
-        data2 = await next2
-        assert data1 == data2
-        lines = data1.splitlines()
-        assert lines[0] == "event: message"
-        payload = json.loads(lines[1].split("data: ")[1])
-        assert payload["result"]["protocolVersion"] == "2024-11-05"
-        await gen1.aclose()
-        await gen2.aclose()
-        assert not main.mcp_queues
-    asyncio.run(run_test())
-
-
-def test_handshake_removed():
-    assert not any(route.path == "/handshake" for route in main.app.routes)
-
-
-def test_mcp_stream_invalid_origin():
-    async def run_test():
-        try:
-            await main.mcp_stream(FakeRequest(headers={"origin": "http://evil.com"}))
-        except main.HTTPException as exc:
-            assert exc.status_code == 403
-        else:
-            assert False, "Expected HTTPException"
-
-    asyncio.run(run_test())
-
-
-def test_mcp_stream_missing_origin():
-    async def run_test():
-        try:
-            await main.mcp_stream(FakeRequest(headers={}))
-        except main.HTTPException as exc:
-            assert exc.status_code == 403
-        else:
-            assert False, "Expected HTTPException"
-
-    asyncio.run(run_test())
-
-
-def test_mcp_stream_initial_event():
-    async def run_test():
-        main.mcp_queues.clear()
-        class Req:
-            def __init__(self):
-                self.headers = {"origin": "http://localhost"}
-
-        # Establish the stream (but don't consume the returned StreamingResponse)
-        await main.mcp_stream(Req())
-        assert len(main.mcp_queues) == 1
-        queue = next(iter(main.mcp_queues))
-        gen = main._event_generator(queue)
-        first = await gen.__anext__()
-        assert first.startswith("event: endpoint")
-        await gen.aclose()
-        assert not main.mcp_queues
-
-    asyncio.run(run_test())
-
-
-def test_mcp_post_invalid_origin():
-    async def run_test():
-        try:
-            await main.mcp_message(FakeRequest({}, headers={"origin": "http://evil.com"}))
-        except main.HTTPException as exc:
-            assert exc.status_code == 403
-        else:
-            assert False, "Expected HTTPException"
-
-    asyncio.run(run_test())
-
-
-def test_mcp_post_missing_origin():
-
-    async def run_test():
-        try:
-            await main.mcp_message(FakeRequest({"method": "initialize"}, headers={}))
-        except main.HTTPException as exc:
-            assert exc.status_code == 403
-        else:
-            assert False, "Expected HTTPException"
-
-    asyncio.run(run_test())
-
-
 def test_post_cast_missing_token(monkeypatch):
     monkeypatch.setattr(main.warpcast_api, "has_token", lambda: False)
     try:
@@ -223,38 +114,6 @@ def test_post_cast_missing_token(monkeypatch):
         assert exc.status_code == 500
     else:
         assert False, "Expected HTTPException"
-
-
-def test_mcp_post_unknown_method():
-    async def run_test():
-        try:
-            await main.mcp_message(FakeRequest({"method": "unknown"}))
-        except main.HTTPException as exc:
-            assert exc.status_code == 404
-        else:
-            assert False, "Expected HTTPException"
-
-    asyncio.run(run_test())
-
-
-def test_mcp_post_invalid_json():
-    class BadRequest:
-        def __init__(self):
-            self.headers = {"origin": "http://localhost"}
-
-        async def json(self):
-            raise json.JSONDecodeError("bad", "bad", 0)
-
-    async def run_test():
-        try:
-            await main.mcp_message(BadRequest())
-        except main.HTTPException as exc:
-            assert exc.status_code == 400
-        else:
-            assert False, "Expected HTTPException"
-
-    asyncio.run(run_test())
-
 
 
 def test_auth_helpers_environment(monkeypatch):
@@ -267,4 +126,10 @@ def test_auth_helpers_environment(monkeypatch):
     monkeypatch.setenv("WARPCAST_API_TOKEN", "secret")
     assert warpcast_api.has_token()
     assert warpcast_api._auth_headers() == {"Authorization": "Bearer secret"}
+
+
+def test_tools_registered():
+    # Ensure that the FastMCP server registered the expected tools
+    tool_names = {t["name"] for t in main.mcp.tools}
+    assert "post-cast" in tool_names
 
