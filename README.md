@@ -126,26 +126,29 @@ The tests mock the Warpcast API layer so no network connection is required.
 ## MCP Compatibility
 
 This server is compatible with the [Model Context Protocol](https://modelcontextprotocol.org/).
-MCP clients must perform a handshake before using any tools. The handshake
-confirms the protocol version and lets the client discover available endpoints.
+After opening a Server-Sent Events connection to `/mcp`, send an `initialize`
+JSON-RPC message. The response on the event stream includes
+`{"protocolVersion": "2024-11-05"}` which confirms compatibility.
 
-### Handshake example
+### Initialization example
 
-Start the server and issue a `POST` request to `/handshake`:
+In one terminal start listening for events:
 
 ```bash
-curl -X POST http://localhost:8000/handshake \
+curl -N http://localhost:8000/mcp
+```
+
+In another terminal send the `initialize` message:
+
+```bash
+curl -X POST http://localhost:8000/mcp \
      -H "Content-Type: application/json" \
-     -d '{"client": "curl", "protocol_version": "0.1"}'
+     -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
 ```
 
-The server will respond with its protocol version:
+The server responds on the first terminal with the protocol version.
 
-```json
-{"server":"warpcast-mcp-server","protocol_version":"0.1"}
-```
-
-After the handshake you can call tool endpoints, for example to post a cast:
+After initialization you can call tool endpoints, for example to post a cast:
 
 ```bash
 curl -X POST http://localhost:8000/post-cast \

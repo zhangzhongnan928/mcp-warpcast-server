@@ -156,19 +156,6 @@ async def mcp_message(request: Request):
 
     raise HTTPException(status_code=404, detail="Method not found")
     
-class HandshakeRequest(BaseModel):
-    """Payload for MCP handshake."""
-    client: Optional[str] = None
-    protocol_version: str = "0.1"
-
-
-@app.post("/handshake")
-def handshake(req: HandshakeRequest):
-    """Basic MCP handshake endpoint."""
-    return {
-        "server": "warpcast-mcp-server",
-        "protocol_version": req.protocol_version,
-    }
 
 @app.post("/post-cast")
 def post_cast(req: CastRequest):
