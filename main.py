@@ -4,7 +4,6 @@ from pydantic import BaseModel
 import asyncio
 import json
 import os
-import sys
 from urllib.parse import urlparse
 
 import logging
@@ -12,6 +11,7 @@ from typing import Optional
 
 import warpcast_api
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Warpcast MCP Server")
@@ -116,7 +116,7 @@ async def _event_generator(queue: asyncio.Queue):
     try:
         while True:
             data = await queue.get()
-            print(f"SSE send: {data}", file=sys.stderr)
+            logger.debug("SSE send: %s", data)
             if isinstance(data, dict) and "event" in data and "data" in data:
                 event = data["event"]
                 payload = data["data"]
@@ -126,7 +126,7 @@ async def _event_generator(queue: asyncio.Queue):
             yield f"event: {event}\ndata: {json.dumps(payload)}\n\n"
     finally:
         # Connection closed
-        print("SSE connection closed", file=sys.stderr)
+        logger.info("SSE connection closed")
         mcp_queues.discard(queue)
 
 
@@ -134,9 +134,9 @@ async def _event_generator(queue: asyncio.Queue):
 async def mcp_stream(request: Request):
     """Establish an SSE connection for MCP messages."""
     origin = request.headers.get("origin")
-    print(f"/mcp GET from origin: {origin}", file=sys.stderr)
+    logger.info("/mcp GET from origin: %s", origin)
     if not origin or not _origin_allowed(origin):
-        print("Origin not allowed", file=sys.stderr)
+        logger.info("Origin not allowed")
         raise HTTPException(status_code=403)
     queue = asyncio.Queue()
     mcp_queues.add(queue)
@@ -148,12 +148,12 @@ async def mcp_stream(request: Request):
 async def mcp_message(request: Request):
     """Handle JSON-RPC messages sent by the client."""
     origin = request.headers.get("origin")
-    print(f"/mcp POST from origin: {origin}", file=sys.stderr)
+    logger.info("/mcp POST from origin: %s", origin)
     if not origin or not _origin_allowed(origin):
-        print("Origin not allowed", file=sys.stderr)
+        logger.info("Origin not allowed")
         raise HTTPException(status_code=403)
     message = await request.json()
-    print(f"Received message: {message}", file=sys.stderr)
+    logger.debug("Received message: %s", message)
 
     if message.get("method") == "initialize":
         if not mcp_queues:
@@ -169,7 +169,7 @@ async def mcp_message(request: Request):
             },
         }
         for q in list(mcp_queues):
-            print("Sending initialize response", file=sys.stderr)
+            logger.debug("Sending initialize response")
             await q.put(response)
         return {"status": "ok"}
 
@@ -182,7 +182,7 @@ async def mcp_message(request: Request):
             "result": {"tools": TOOLS, "nextCursor": None},
         }
         for q in list(mcp_queues):
-            print("Sending tools/list response", file=sys.stderr)
+            logger.debug("Sending tools/list response")
             await q.put(response)
         return {"status": "ok"}
 
