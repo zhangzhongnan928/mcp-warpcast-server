@@ -3,6 +3,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import asyncio
 import json
+import os
+from urllib.parse import urlparse
 
 import logging
 from typing import Optional
@@ -15,6 +17,21 @@ app = FastAPI(title="Warpcast MCP Server")
 
 # Simple in-memory queue for SSE communication
 mcp_queue: asyncio.Queue | None = None
+
+# Allowed origins for SSE connections
+ALLOWED_ORIGINS = {
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+}
+
+
+def _origin_allowed(origin: str) -> bool:
+    """Return True if the origin is localhost or in ALLOWED_ORIGINS."""
+    if origin in ALLOWED_ORIGINS:
+        return True
+    parsed = urlparse(origin)
+    return parsed.hostname in {"localhost", "127.0.0.1"}
 
 # Tool definitions exposed via MCP
 TOOLS = [
@@ -94,8 +111,11 @@ async def _event_generator(queue: asyncio.Queue):
 
 
 @app.get("/mcp")
-async def mcp_stream():
+async def mcp_stream(request: Request):
     """Establish an SSE connection for MCP messages."""
+    origin = request.headers.get("origin")
+    if not origin or not _origin_allowed(origin):
+        raise HTTPException(status_code=403)
     global mcp_queue
     queue = asyncio.Queue()
     mcp_queue = queue

@@ -101,3 +101,10 @@ def test_handshake_removed():
     response = client.post("/handshake", json={})
     assert response.status_code == 404
 
+    def test_mcp_stream_invalid_origin():
+    response = client.get("/mcp", headers={"Origin": "http://evil.com"})
+    assert response.status_code == 403
+
+def test_mcp_stream_missing_origin():
+    response = client.get("/mcp")
+    assert response.status_code == 403
