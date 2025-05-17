@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Warpcast MCP Server")
 
-# Simple in-memory queue for SSE communication
-mcp_queue: asyncio.Queue | None = None
+# Queues for SSE communication (one per connection)
+mcp_queues: set[asyncio.Queue] = set()
 
 # Tool definitions exposed via MCP
 TOOLS = [
@@ -89,16 +89,14 @@ async def _event_generator(queue: asyncio.Queue):
             yield f"data: {json.dumps(data)}\n\n"
     finally:
         # Connection closed
-        if mcp_queue is queue:
-            globals()["mcp_queue"] = None
+        mcp_queues.discard(queue)
 
 
 @app.get("/mcp")
 async def mcp_stream():
     """Establish an SSE connection for MCP messages."""
-    global mcp_queue
     queue = asyncio.Queue()
-    mcp_queue = queue
+    mcp_queues.add(queue)
     return StreamingResponse(_event_generator(queue), media_type="text/event-stream")
 
 
@@ -108,7 +106,7 @@ async def mcp_message(request: Request):
     message = await request.json()
 
     if message.get("method") == "initialize":
-        if not mcp_queue:
+        if not mcp_queues:
             raise HTTPException(status_code=400, detail="MCP stream not established")
 
         response = {
@@ -120,18 +118,20 @@ async def mcp_message(request: Request):
                 "serverInfo": {"name": "Warpcast MCP Server", "version": "0.1.0"},
             },
         }
-        await mcp_queue.put(response)
+        for q in list(mcp_queues):
+            await q.put(response)
         return {"status": "ok"}
 
     if message.get("method") == "tools/list":
-        if not mcp_queue:
+        if not mcp_queues:
             raise HTTPException(status_code=400, detail="MCP stream not established")
         response = {
             "jsonrpc": "2.0",
             "id": message.get("id"),
             "result": {"tools": TOOLS, "nextCursor": None},
         }
-        await mcp_queue.put(response)
+        for q in list(mcp_queues):
+            await q.put(response)
         return {"status": "ok"}
 
     raise HTTPException(status_code=404, detail="Method not found")

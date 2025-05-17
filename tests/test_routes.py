@@ -1,98 +1,115 @@
+import asyncio
 import json
-import pytest
-from fastapi.testclient import TestClient
 
 import main
 
-client = TestClient(main.app)
+# Helper request object for mcp_message
+class FakeRequest:
+    def __init__(self, payload):
+        self._payload = payload
+
+    async def json(self):
+        return self._payload
 
 
 def test_post_cast(monkeypatch):
+    monkeypatch.setattr(main, "ensure_token", lambda: None)
     def mock_post_cast(text):
         return {"status": "success", "text": text}
-
     monkeypatch.setattr(main.warpcast_api, "post_cast", mock_post_cast)
-    response = client.post("/post-cast", json={"text": "hello"})
-    assert response.status_code == 200
-    assert response.json() == {"status": "success", "text": "hello"}
+    result = main.post_cast(main.CastRequest(text="hello"))
+    assert result == {"status": "success", "text": "hello"}
 
 
 def test_user_casts(monkeypatch):
+    monkeypatch.setattr(main, "ensure_token", lambda: None)
     def mock_user_casts(username, limit=20):
         return {"casts": [f"{username}-{limit}"]}
-
     monkeypatch.setattr(main.warpcast_api, "get_user_casts", mock_user_casts)
-    response = client.get("/user-casts/alice?limit=5")
-    assert response.status_code == 200
-    assert response.json() == {"casts": ["alice-5"]}
+    result = main.user_casts("alice", limit=5)
+    assert result == {"casts": ["alice-5"]}
 
 
 def test_search_casts(monkeypatch):
+    monkeypatch.setattr(main, "ensure_token", lambda: None)
     def mock_search_casts(q, limit=20):
         return {"results": [q, limit]}
-
     monkeypatch.setattr(main.warpcast_api, "search_casts", mock_search_casts)
-    response = client.get("/search-casts?q=test&limit=3")
-    assert response.status_code == 200
-    assert response.json() == {"results": ["test", 3]}
+    result = main.search_casts("test", limit=3)
+    assert result == {"results": ["test", 3]}
 
 
 def test_trending_casts(monkeypatch):
+    monkeypatch.setattr(main, "ensure_token", lambda: None)
     def mock_trending_casts(limit=20):
         return {"trending": limit}
-
     monkeypatch.setattr(main.warpcast_api, "get_trending_casts", mock_trending_casts)
-    response = client.get("/trending-casts?limit=4")
-    assert response.status_code == 200
-    assert response.json() == {"trending": 4}
+    result = main.trending_casts(limit=4)
+    assert result == {"trending": 4}
 
 
 def test_all_channels(monkeypatch):
+    monkeypatch.setattr(main, "ensure_token", lambda: None)
     def mock_all_channels():
         return {"channels": []}
-
     monkeypatch.setattr(main.warpcast_api, "get_all_channels", mock_all_channels)
-    response = client.get("/channels")
-    assert response.status_code == 200
-    assert response.json() == {"channels": []}
+    result = main.all_channels()
+    assert result == {"channels": []}
 
 
 def test_get_channel(monkeypatch):
+    monkeypatch.setattr(main, "ensure_token", lambda: None)
     def mock_get_channel(channel_id):
         return {"channel": channel_id}
-
     monkeypatch.setattr(main.warpcast_api, "get_channel", mock_get_channel)
-    response = client.get("/channels/123")
-    assert response.status_code == 200
-    assert response.json() == {"channel": "123"}
+    result = main.get_channel("123")
+    assert result == {"channel": "123"}
 
 
 def test_channel_casts(monkeypatch):
+    monkeypatch.setattr(main, "ensure_token", lambda: None)
     def mock_channel_casts(channel_id, limit=20):
         return {"casts": [channel_id, limit]}
-
     monkeypatch.setattr(main.warpcast_api, "get_channel_casts", mock_channel_casts)
-    response = client.get("/channels/abc/casts?limit=2")
-    assert response.status_code == 200
-    assert response.json() == {"casts": ["abc", 2]}
+    result = main.channel_casts("abc", limit=2)
+    assert result == {"casts": ["abc", 2]}
 
 
 def test_follow_channel(monkeypatch):
+    monkeypatch.setattr(main, "ensure_token", lambda: None)
     def mock_follow_channel(channel_id):
         return {"status": "success", "channel": channel_id}
-
     monkeypatch.setattr(main.warpcast_api, "follow_channel", mock_follow_channel)
-    response = client.post("/follow-channel", json={"channel_id": "xyz"})
-    assert response.status_code == 200
-    assert response.json() == {"status": "success", "channel": "xyz"}
+    result = main.follow_channel(main.ChannelRequest(channel_id="xyz"))
+    assert result == {"status": "success", "channel": "xyz"}
 
 
 def test_unfollow_channel(monkeypatch):
+    monkeypatch.setattr(main, "ensure_token", lambda: None)
     def mock_unfollow_channel(channel_id):
         return {"status": "success", "channel": channel_id}
-
     monkeypatch.setattr(main.warpcast_api, "unfollow_channel", mock_unfollow_channel)
-    response = client.post("/unfollow-channel", json={"channel_id": "xyz"})
-    assert response.status_code == 200
-    assert response.json() == {"status": "success", "channel": "xyz"}
+    result = main.unfollow_channel(main.ChannelRequest(channel_id="xyz"))
+    assert result == {"status": "success", "channel": "xyz"}
 
+
+def test_mcp_multiple_streams():
+    async def run_test():
+        q1 = asyncio.Queue()
+        q2 = asyncio.Queue()
+        main.mcp_queues.add(q1)
+        main.mcp_queues.add(q2)
+        gen1 = main._event_generator(q1)
+        gen2 = main._event_generator(q2)
+        next1 = asyncio.create_task(gen1.__anext__())
+        next2 = asyncio.create_task(gen2.__anext__())
+        await main.mcp_message(FakeRequest({"method": "initialize", "id": 1}))
+        data1 = await next1
+        data2 = await next2
+        assert data1 == data2
+        payload = json.loads(data1.split("data: ")[1])
+        assert payload["result"]["protocolVersion"] == "2024-11-05"
+        await gen1.aclose()
+        await gen2.aclose()
+        assert not main.mcp_queues
+    asyncio.run(run_test())
