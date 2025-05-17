@@ -96,3 +96,8 @@ def test_unfollow_channel(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {"status": "success", "channel": "xyz"}
 
+
+def test_handshake_removed():
+    response = client.post("/handshake", json={})
+    assert response.status_code == 404
+
