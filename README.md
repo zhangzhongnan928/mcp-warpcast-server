@@ -96,3 +96,7 @@ Follow these steps to access the Warpcast tools from Claude's desktop applicatio
 ```
 
 4. Save the file and restart Claude Desktop. You should now see a hammer icon in the chat input that lets you use the Warpcast tools.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
