@@ -96,3 +96,33 @@ Follow these steps to access the Warpcast tools from Claude's desktop applicatio
 ```
 
 4. Save the file and restart Claude Desktop. You should now see a hammer icon in the chat input that lets you use the Warpcast tools.
+
+## MCP Compatibility
+
+This server is compatible with the [Model Context Protocol](https://modelcontextprotocol.org/).
+MCP clients must perform a handshake before using any tools. The handshake
+confirms the protocol version and lets the client discover available endpoints.
+
+### Handshake example
+
+Start the server and issue a `POST` request to `/handshake`:
+
+```bash
+curl -X POST http://localhost:8000/handshake \
+     -H "Content-Type: application/json" \
+     -d '{"client": "curl", "protocol_version": "0.1"}'
+```
+
+The server will respond with its protocol version:
+
+```json
+{"server":"warpcast-mcp-server","protocol_version":"0.1"}
+```
+
+After the handshake you can call tool endpoints, for example to post a cast:
+
+```bash
+curl -X POST http://localhost:8000/post-cast \
+     -H "Content-Type: application/json" \
+     -d '{"text":"Hello from curl"}'
+```
