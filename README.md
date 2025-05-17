@@ -47,10 +47,44 @@ This MCP server provides several tools that Claude can use:
    ```bash
    pip install -r requirements.txt
    ```
-2. Set the `WARPCAST_API_TOKEN` environment variable with your API token.
+2. Provide your Warpcast API token. You can either set the
+   `WARPCAST_API_TOKEN` environment variable or supply it in the `env`
+   section of Claude's configuration (see below).
 3. Start the server:
    ```bash
    uvicorn main:app --reload
    ```
 
 The server exposes HTTP endpoints matching the tools listed above.
+
+## Using with Claude Desktop
+
+Follow these steps to access the Warpcast tools from Claude's desktop application:
+
+1. Start the server (or let Claude launch it) using the setup instructions above.
+2. Open your Claude configuration file:
+   - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+3. Add the Warpcast server under the `mcpServers` key. Replace the path with the location of this repository:
+
+```json
+{
+  "mcpServers": {
+    "warpcast": {
+      "command": "uvicorn",
+      "args": [
+        "--app-dir",
+        "/ABSOLUTE/PATH/TO/mcp-warpcast-server",
+        "main:app",
+        "--port",
+        "8000"
+      ],
+      "env": {
+        "WARPCAST_API_TOKEN": "YOUR_API_TOKEN"
+      }
+    }
+  }
+}
+```
+
+4. Save the file and restart Claude Desktop. You should now see a hammer icon in the chat input that lets you use the Warpcast tools.
