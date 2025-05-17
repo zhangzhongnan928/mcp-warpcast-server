@@ -1,5 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+import asyncio
+import json
+
 import logging
 from typing import Optional
 
@@ -8,6 +12,49 @@ import warpcast_api
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Warpcast MCP Server")
+
+# Simple in-memory queue for SSE communication
+mcp_queue: asyncio.Queue | None = None
+
+# Tool definitions exposed via MCP
+TOOLS = [
+    {
+        "name": "post-cast",
+        "description": "Create a new post on Warpcast (max 320 characters)",
+    },
+    {
+        "name": "get-user-casts",
+        "description": "Retrieve recent casts from a specific user",
+    },
+    {
+        "name": "search-casts",
+        "description": "Search for casts by keyword or phrase",
+    },
+    {
+        "name": "get-trending-casts",
+        "description": "Get the currently trending casts on Warpcast",
+    },
+    {
+        "name": "get-all-channels",
+        "description": "List available channels on Warpcast",
+    },
+    {
+        "name": "get-channel",
+        "description": "Get information about a specific channel",
+    },
+    {
+        "name": "get-channel-casts",
+        "description": "Get casts from a specific channel",
+    },
+    {
+        "name": "follow-channel",
+        "description": "Follow a channel",
+    },
+    {
+        "name": "unfollow-channel",
+        "description": "Unfollow a channel",
+    },
+]
 
 
 @app.on_event("startup")
@@ -34,6 +81,61 @@ class ChannelRequest(BaseModel):
     channel_id: str
 
 
+async def _event_generator(queue: asyncio.Queue):
+    """Yield server-sent events from the queue."""
+    try:
+        while True:
+            data = await queue.get()
+            yield f"data: {json.dumps(data)}\n\n"
+    finally:
+        # Connection closed
+        if mcp_queue is queue:
+            globals()["mcp_queue"] = None
+
+
+@app.get("/mcp")
+async def mcp_stream():
+    """Establish an SSE connection for MCP messages."""
+    global mcp_queue
+    queue = asyncio.Queue()
+    mcp_queue = queue
+    return StreamingResponse(_event_generator(queue), media_type="text/event-stream")
+
+
+@app.post("/mcp")
+async def mcp_message(request: Request):
+    """Handle JSON-RPC messages sent by the client."""
+    message = await request.json()
+
+    if message.get("method") == "initialize":
+        if not mcp_queue:
+            raise HTTPException(status_code=400, detail="MCP stream not established")
+
+        response = {
+            "jsonrpc": "2.0",
+            "id": message.get("id"),
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {"listChanged": False}},
+                "serverInfo": {"name": "Warpcast MCP Server", "version": "0.1.0"},
+            },
+        }
+        await mcp_queue.put(response)
+        return {"status": "ok"}
+
+    if message.get("method") == "tools/list":
+        if not mcp_queue:
+            raise HTTPException(status_code=400, detail="MCP stream not established")
+        response = {
+            "jsonrpc": "2.0",
+            "id": message.get("id"),
+            "result": {"tools": TOOLS, "nextCursor": None},
+        }
+        await mcp_queue.put(response)
+        return {"status": "ok"}
+
+    raise HTTPException(status_code=404, detail="Method not found")
+    
 class HandshakeRequest(BaseModel):
     """Payload for MCP handshake."""
     client: Optional[str] = None
@@ -47,7 +149,6 @@ def handshake(req: HandshakeRequest):
         "server": "warpcast-mcp-server",
         "protocol_version": req.protocol_version,
     }
-
 
 @app.post("/post-cast")
 def post_cast(req: CastRequest):
