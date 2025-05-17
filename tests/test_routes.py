@@ -158,3 +158,13 @@ def test_mcp_stream_initial_event():
         assert not main.mcp_queues
 
     asyncio.run(run_test())
+
+
+def test_mcp_post_invalid_origin():
+    response = client.post("/mcp", json={}, headers={"Origin": "http://evil.com"})
+    assert response.status_code == 403
+
+
+def test_mcp_post_missing_origin():
+    response = client.post("/mcp", json={"method": "initialize"})
+    assert response.status_code == 403

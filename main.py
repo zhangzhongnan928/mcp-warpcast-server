@@ -130,6 +130,9 @@ async def mcp_stream(request: Request):
 @app.post("/mcp")
 async def mcp_message(request: Request):
     """Handle JSON-RPC messages sent by the client."""
+    origin = request.headers.get("origin")
+    if not origin or not _origin_allowed(origin):
+        raise HTTPException(status_code=403)
     message = await request.json()
 
     if message.get("method") == "initialize":
