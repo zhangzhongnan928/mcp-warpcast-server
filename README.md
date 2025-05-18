@@ -69,6 +69,8 @@ Claude Desktop normally launches this server for you when the Warpcast tools are
    is logged and authorized requests will respond with **HTTP 500** errors.
 
 4. (Optional) Start the server manually:
+   The `app` variable exported from `main.py` is created using
+   `mcp.streamable_http_app()` so it can be served by any ASGI server.
    ```bash
    uvicorn main:app --reload
    ```

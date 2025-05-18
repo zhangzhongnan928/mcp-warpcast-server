@@ -14,7 +14,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP("Warpcast MCP Server")
-app = mcp.app
+
+# Expose the FastMCP server as an ASGI app. The real MCP SDK uses
+# ``streamable_http_app`` to provide the application instance.  The
+# fallback stub implements the same method for tests.
+app = mcp.streamable_http_app()
+
 
 
 

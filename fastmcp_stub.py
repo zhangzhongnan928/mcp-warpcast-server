@@ -24,3 +24,13 @@ class FastMCP:
         import uvicorn
 
         uvicorn.run(self.app, **kwargs)
+
+    # The real FastMCP exposes ``streamable_http_app`` and ``sse_app`` to
+    # create ASGI applications for different transports.  Our tests only
+    # need a single FastAPI app, so both methods simply return ``self.app``.
+
+    def streamable_http_app(self, mount_path: str | None = None):  # pragma: no cover - stub
+        return self.app
+
+    def sse_app(self, mount_path: str | None = None):  # pragma: no cover - stub
+        return self.app
