@@ -23,6 +23,7 @@ app = mcp.streamable_http_app()
 
 
 
+
 @app.on_event("startup")
 async def validate_token() -> None:
     if not warpcast_api.has_token():
