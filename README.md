@@ -1,7 +1,7 @@
 # Warpcast MCP Server
 
 A Model Context Protocol (MCP) server for Warpcast integration that allows you to use Claude to interact with your Warpcast account.  
-The implementation now follows the [FastMCP](https://modelcontextprotocol.io) style server from the MCP Python SDK. A small stub of the SDK is bundled so the project can run without external dependencies.
+The implementation now follows the [FastMCP](https://modelcontextprotocol.io) style server from the MCP Python SDK.
 
 ## Features
 
@@ -53,7 +53,7 @@ Claude Desktop normally launches this server for you when the Warpcast tools are
    python3 -m venv venv
    source venv/bin/activate
    ```
-2. Install dependencies:
+2. Install dependencies (the requirements include the MCP Python SDK):
    ```bash
    pip install -r requirements.txt
    ```
@@ -69,29 +69,13 @@ Claude Desktop normally launches this server for you when the Warpcast tools are
    is logged and authorized requests will respond with **HTTP 500** errors.
 
 4. (Optional) Start the server manually:
+   The `app` variable exported from `main.py` is created using
+   `mcp.streamable_http_app()` so it can be served by any ASGI server.
    ```bash
    uvicorn main:app --reload
    ```
 
-The server exposes HTTP endpoints matching the tools listed above.
-
-### MCP Endpoint
-
-An additional `/mcp` route implements the [Model Context Protocol](https://modelcontextprotocol.io/). To use it:
-
-1. Start the server as usual:
-   ```bash
-   uvicorn main:app --reload
-   ```
-2. Open a Server-Sent Events connection to `http://localhost:8000/mcp`. The request must include an `Origin` header. The server accepts connections from `localhost` and any hosts listed in `ALLOWED_ORIGINS`:
-
-```bash
-export ALLOWED_ORIGINS="file://,https://myapp.com"
-```
-
-3. Once the stream is open, POST JSON-RPC messages (such as the `initialize` request) to the same path. The server rejects JSON-RPC messages until an SSE connection is established.
-
-After initialization clients can discover the Warpcast tools using the `tools/list` method.
+The server exposes HTTP endpoints matching the tools listed above and a standard `/mcp` endpoint provided by FastMCP.
 
 ## Using with Claude Desktop
 
@@ -146,38 +130,7 @@ The tests mock the Warpcast API layer so no network connection is required.
 
 ## MCP Compatibility
 
-This server is compatible with the [Model Context Protocol](https://modelcontextprotocol.org/).
-After opening a Server-Sent Events connection to `/mcp`, send an `initialize`
-JSON-RPC message. The response on the event stream includes
-`{"protocolVersion": "2024-11-05"}` which confirms compatibility.
-
-### Initialization example
-
-In one terminal start listening for events (the request **must** include an
-`Origin` header matching `localhost` or a value listed in `ALLOWED_ORIGINS`):
-
-```bash
-curl -N http://localhost:8000/mcp \
-     -H "Origin: http://localhost"
-```
-
-In another terminal send the `initialize` message:
-
-```bash
-curl -X POST http://localhost:8000/mcp \
-     -H "Content-Type: application/json" \
-     -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
-```
-
-The server responds on the first terminal with the protocol version.
-
-After initialization you can call tool endpoints, for example to post a cast:
-
-```bash
-curl -X POST http://localhost:8000/post-cast \
-     -H "Content-Type: application/json" \
-     -d '{"text":"Hello from curl"}'
-```
+This server uses the official MCP Python SDK and is fully compatible with the [Model Context Protocol](https://modelcontextprotocol.org/). Clients can connect to the `/mcp` endpoint provided by FastMCP and interact with the tools defined here.
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
