@@ -15,10 +15,20 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP("Warpcast MCP Server")
 
-# Expose the FastMCP server as an ASGI app. The real MCP SDK uses
-# ``streamable_http_app`` to provide the application instance.  The
-# fallback stub implements the same method for tests.
-app = mcp.streamable_http_app()
+# Expose the FastMCP server as an ASGI app. Different versions of the MCP
+# SDK have used slightly different method names for obtaining the HTTP app,
+# so we check for them in order of preference.  Our test stub implements
+# ``streamable_http_app`` which is used by older SDK releases.
+if hasattr(mcp, "streamable_http_app"):
+    app = mcp.streamable_http_app()
+elif hasattr(mcp, "http_app"):
+    # Newer SDKs provide ``http_app``
+    app = mcp.http_app()
+elif hasattr(mcp, "app"):
+    # Fall back to an ``app`` attribute if exposed
+    app = mcp.app
+else:
+    raise AttributeError("FastMCP does not provide an HTTP app")
 
 
 
